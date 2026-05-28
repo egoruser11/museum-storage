@@ -1,0 +1,60 @@
+name: museum-storage
+
+services:
+    app:
+        image: museum-storage-php:local
+        build:
+            context: .
+            dockerfile: ./docker/app/Dockerfile
+        environment:
+            APP_NAME: "Museum Storage"
+            APP_URL: http://localhost:8890
+            DB_CONNECTION: pgsql
+            DB_HOST: postgres
+            DB_PORT: 5432
+            DB_DATABASE: museum_storage
+            DB_USERNAME: museum_user
+            DB_PASSWORD: museum_password
+            SESSION_DRIVER: file
+            CACHE_STORE: file
+            QUEUE_CONNECTION: sync
+        volumes:
+            - ./:/var/www
+        command: php-fpm
+        expose:
+            - "9000"
+        depends_on:
+            postgres:
+                condition: service_healthy
+        container_name: museum-storage-app
+
+    nginx:
+        image: nginx:1.29-alpine
+        volumes:
+            - ./:/var/www:ro
+            - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+        ports:
+            - "8890:80"
+        depends_on:
+            - app
+        container_name: museum-storage-nginx
+
+    postgres:
+        image: postgres:17-alpine
+        environment:
+            POSTGRES_DB: museum_storage
+            POSTGRES_USER: museum_user
+            POSTGRES_PASSWORD: museum_password
+        ports:
+            - "5434:5432"
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U museum_user -d museum_storage"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+        container_name: museum-storage-postgres
+
+volumes:
+    postgres-data:
